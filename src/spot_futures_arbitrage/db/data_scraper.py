@@ -47,11 +47,9 @@ SYM_FUT_ETH  = find_future_symbols(fut, 'ETH', 'USDT')
 
 def fetch_and_store(exchange: ccxt.Exchange, symbols: list[str], futures: int = 0):
     """Fetch ticker data for the given symbols and store in the database."""
-    print(DB_PATH)
     for symbol in symbols:
         if futures:
             expiration_date = exchange.markets[symbol].get('expiry', None)
-
         try:
             ticker = exchange.fetch_ticker(symbol)
             ts = ticker['timestamp'] or int(time.time() * 1000)
@@ -79,6 +77,42 @@ def fetch_and_store(exchange: ccxt.Exchange, symbols: list[str], futures: int = 
         except Exception as e:
             logger.error(f"Error fetching  {symbol}: {e}")
 
+def fetch_and_store_historical(exchange: ccxt.Exchange, symbols: list[str], futures: int = 0):
+    """Fetch ticker data for the given symbols and store in the database."""
+    print(symbols)
+    for symbol in symbols:
+        if futures:
+            expiration_date = exchange.markets[symbol].get('expiry', None)
+            expiration_date = datetime.fromtimestamp(expiration_date / 1000).isoformat() if expiration_date else None
+        else:
+            expiration_date = None
+
+        try:
+            ticker = exchange.fetch_ohlcv(symbol)
+            for row in ticker:
+                ts, open, high, low, close, volume = row
+                dt = datetime.fromtimestamp(ts/1000).isoformat()
+                with sqlite3.connect(DB_PATH) as conn:
+                    cur = conn.cursor()
+                    cur.execute("INSERT or IGNORE INTO historical_prices VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                              (ts,
+                               dt,
+                               symbol,
+                               open,
+                               high,
+                               low,
+                               close,
+                               volume,
+                               futures,
+                               expiration_date
+                               ))
+                    conn.commit()
+
+                logger.info(f"[{dt}] {symbol}: open={open}, high={high}, low={low}, close={close}, volume={volume}")
+        except Exception as e:
+            logger.error(f"Error fetching  {symbol}: {e}")
+
+
 def main():
     while True:
         now = time.time()
@@ -86,6 +120,11 @@ def main():
         fetch_and_store(spot,  SYM_SPOT_ETH)
         fetch_and_store(fut,  SYM_FUT_BTC, 1)
         fetch_and_store(fut,  SYM_FUT_ETH, 1)
+        fetch_and_store_historical(spot,  SYM_SPOT_BTC)
+        fetch_and_store_historical(spot,  SYM_SPOT_ETH)
+        fetch_and_store_historical(fut,  SYM_FUT_BTC, 1)
+        fetch_and_store_historical(fut,  SYM_FUT_ETH, 1)
+       
         sleep_secs = 60 - (time.time() - now)
         if sleep_secs > 0:
             time.sleep(sleep_secs)
