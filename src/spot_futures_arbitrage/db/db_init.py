@@ -1,6 +1,6 @@
 import sqlite3
 import logging
-from db_config import DB_PATH
+from spot_futures_arbitrage.db.db_config import DB_PATH
 
 logger = logging.getLogger('okx_prices')
 logger.setLevel(logging.INFO)
