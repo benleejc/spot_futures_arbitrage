@@ -17,12 +17,9 @@ import ccxt
 # Load environment variables
 load_dotenv()
 
-# Import SAFE_MARGIN from config
-from config import SAFE_MARGIN, IS_SIMULATION, COIN_LIST
-from logger_config import setup_logger
-
-# Configure logging
-logger = setup_logger(__name__)
+import logging
+logger = logging.getLogger('okx_prices')
+logger.basicConfig(level=logging.INFO, format='%(asctime)s | %(levelname)s | %(message)s')
 
 class OKXTrader:
     """
@@ -30,13 +27,16 @@ class OKXTrader:
     order placement, cancellation, and synchronization with the OKX exchange via CCXT.
     """
 
-    def __init__(self):
+    def __init__(self, safe_margin: float=0, is_simulation: bool=True, coin_list: list[str]=['BTC/USD']):
         """
         Initializes the trader instance with authentication credentials and sets up internal attributes.
         Loads credentials from environment variables if not provided explicitly.
         """
 
         # Load credentials from environment if not provided
+        self.SAFE_MARGIN = safe_margin 
+        self.IS_SIMULATION = is_simulation
+        self.COIN_LIST = coin_list
         self.api_key = os.getenv("OKX_API_KEY")
         self.api_secret = os.getenv("OKX_API_SECRET_KEY")
         self.passphrase = os.getenv("OKX_API_PASSPHRASE")
@@ -176,10 +176,9 @@ class OKXTrader:
         Places a basic limit (or market) order on OKX (through CCXT).
         If order_type = 'BUY' or 'SELL', it determines the side.
         """
-        if IS_SIMULATION:
+        if self.IS_SIMULATION:
             print(f"[SIMULATION] calling OKXTrader.place_limit_order('BUY', {instrument_id}, {quantity}, {price})")
             return None
-        #logger.info("Placing limit order...")
         try:
             side = 'buy' if order_type.lower() == 'buy' else 'sell'
             quantity = float(self.exchange.amount_to_precision(instrument_id, quantity))
@@ -187,7 +186,7 @@ class OKXTrader:
                 price = float(self.exchange.price_to_precision(instrument_id, price))
             #print(f"Placing order with: {instrument_id}, {quantity}, {side}, {price}")
             # Check if we have enough balance (minus SAFE_MARGIN) - simplistic check
-            if self.balance < (price * quantity if price else 0) + SAFE_MARGIN:
+            if self.balance < (price * quantity if price else 0) + self.SAFE_MARGIN:
                 raise ValueError("Not enough balance to place this order.")
 
             # Construct CCXT order params
@@ -331,7 +330,7 @@ class OKXTrader:
         """
         Place a take profit order. If tpTriggerPx is None, no TP is placed.
         """
-        if IS_SIMULATION:
+        if self.IS_SIMULATION:
             print(f"[SIMULATION] calling OKXTrader.place_take_profit_order('SELL', {instrument_id}, {quantity}, {tpTriggerPx})")
             return None
         logger.info("Placing take profit order...")
@@ -563,7 +562,7 @@ class OKXTrader:
     def get_minimum_investment_by_coin_list(self) -> float:
         #to record the max of the minimum investment among all coins
         min_investment =0
-        for coin in COIN_LIST:
+        for coin in self.COIN_LIST:
             min_investment = max(min_investment, self.get_minimum_investment_by_coin(coin))
         return min_investment
     
