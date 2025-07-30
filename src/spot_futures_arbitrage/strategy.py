@@ -178,7 +178,6 @@ def generate_signals(f, base: str, quote: str, signal_col: str='signal', timefra
     :param kwargs: Additional arguments for the strategy function.
     :return: DataFrame with signals.
     """
-    print(signal_col)
     df = f(base=base, quote=quote, timeframe=timeframe, **kwargs)
     df['signal'] = df[signal_col].apply(lambda x: 1 if x > threshold else (-1  if x < -threshold else 0)) 
     return df
