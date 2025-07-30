@@ -2,5 +2,6 @@ from pathlib import Path
 import os
 
 BASE_DIR = Path.cwd()
-os.mkdir(BASE_DIR / 'data', exist_ok=True)
+if not os.path.exists(BASE_DIR / 'data'):
+    os.makedir (BASE_DIR / 'data')
 DB_PATH = BASE_DIR / 'data' / 'okx_prices.db'
