@@ -105,6 +105,8 @@ def resample_prices(df: pd.DataFrame, freq: str = '5min') -> pd.DataFrame:
 
 def symbol_filter(df: pd.DataFrame, base: str, quote: str) -> pd.DataFrame:
     """Filter DataFrame for specific base and quote symbols.
+
+    Helper function to filter dataframe based on base and quote currencies.
     
     :param df: DataFrame with 'symbol' column.
     :param base: Base currency.
@@ -119,6 +121,9 @@ def symbol_filter(df: pd.DataFrame, base: str, quote: str) -> pd.DataFrame:
 
 def calculate_carry(base: str, quote: str, timeframe: str='5min', signal_col='signal') -> pd.DataFrame:
     """Calculate carry signal using the latest data from the DB.
+
+    The carry is defined as the difference between futures and spot prices, adjusted for funding rates (perpetuals) and time to expiry.
+    we pull data from the database, resample it and calculate the carry for each futures contract.
     
     :param base: Base currency.
     :param quote: Quote currency.
@@ -143,8 +148,36 @@ def calculate_carry(base: str, quote: str, timeframe: str='5min', signal_col='si
     futs[signal_col] = futs['carry']
     return futs
 
+
+def generate_signals(f, base: str, quote: str, signal_col: str='signal', timeframe: str='5min', threshold: float=0.05, **kwargs) -> pd.DataFrame:
+    """Generate trading signals based on strategy function.
+
+    The function f should return a DataFrame with a signal column. 
+    generate_signals will apply a threshold to the signal column to determine long, short, or flat positions.
+    if the signal is above the threshold, it will be a long position (1), if below -threshold, a short position (-1), 
+    and in between, it will be flat (0).
+
+    
+    :param f: Strategy function that takes base, quote, timeframe, and other kwargs.
+    :param base: Base currency.
+    :param quote: Quote currency.
+    :param signal_col: Column name for the signal.
+    :param timeframe: Timeframe for the strategy.
+    :param threshold: Threshold for generating signals.
+    :param kwargs: Additional arguments for the strategy function.
+    :return: DataFrame with signals.
+    """
+    df = f(base=base, quote=quote, timeframe=timeframe, **kwargs)
+    df['signal'] = df[signal_col].apply(lambda x: 1 if x > threshold else (-1  if x < -threshold else 0)) 
+    return df
+
 def carry_strategy(base: str, quote: str, timeframe: str='5min', signal_col:str='signal', threshold: float=0.05, **kwargs) -> pd.DataFrame:
     """Carry strategy that generates signals based on carry calculations.
+
+    Carry is defined as the difference between futures and spot prices, adjusted for funding rates (perpetuals) and time to expiry.
+
+    .. math::
+        carry = \frac{FuturesPrice - SpotPrice}{SpotPrice} + FundingRate
     
     :param base: Base currency.
     :param quote: Quote currency.
@@ -165,21 +198,4 @@ def carry_strategy(base: str, quote: str, timeframe: str='5min', signal_col:str=
     df = pd.concat([spot, futs], ignore_index=True)
     df.dropna(subset=[], inplace=True)
     return df 
-
-
-def generate_signals(f, base: str, quote: str, signal_col: str='signal', timeframe: str='5min', threshold: float=0.05, **kwargs) -> pd.DataFrame:
-    """Generate trading signals based on strategy function.
-    
-    :param f: Strategy function that takes base, quote, timeframe, and other kwargs.
-    :param base: Base currency.
-    :param quote: Quote currency.
-    :param signal_col: Column name for the signal.
-    :param timeframe: Timeframe for the strategy.
-    :param threshold: Threshold for generating signals.
-    :param kwargs: Additional arguments for the strategy function.
-    :return: DataFrame with signals.
-    """
-    df = f(base=base, quote=quote, timeframe=timeframe, **kwargs)
-    df['signal'] = df[signal_col].apply(lambda x: 1 if x > threshold else (-1  if x < -threshold else 0)) 
-    return df
 
