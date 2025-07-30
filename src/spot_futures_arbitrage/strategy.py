@@ -140,6 +140,7 @@ def calculate_carry(base: str, quote: str, timeframe: str='5min', signal_col='si
     futs['days_to_expiry'] = (futs['expiration_date'].dt.date - futs['datetime'].dt.date).apply(lambda x: x.days if isinstance(x, timedelta) else None)
 
     futs['carry'] = futs.apply(lambda row: evaluate_trade(row['symbol'], row['close_spot'], row['close'], row['days_to_expiry']), axis=1)
+    futs[signal_col] = futs['carry']
     return futs
 
 def carry_strategy(base: str, quote: str, timeframe: str='5min', signal_col:str='signal', threshold: float=0.05, **kwargs) -> pd.DataFrame:
@@ -162,7 +163,7 @@ def carry_strategy(base: str, quote: str, timeframe: str='5min', signal_col:str=
     spot = df[spot_cols]
     spot = spot.rename(columns={k: v for k,v in zip(spot.columns, spot.columns.str.replace('_spot', ''))})
     df = pd.concat([spot, futs], ignore_index=True)
-    df.dropna(subset=[signal_col], inplace=True)
+    df.dropna(subset=[], inplace=True)
     return df 
 
 
